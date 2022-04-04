@@ -12,7 +12,11 @@
 #include <mutex>
 #include <sstream>
 #include "customer.h"
+#include "utils.h"
 #include "vector_.h"
+
+class Customer;
+
 
 
 class Bank {
@@ -22,15 +26,21 @@ public:
   
   vector_<int> get_avail() const { return avail; }
   bool is_avail(const vector_<int>& req) const { return req < avail; }
-  
-       // TODO --- correctly implement the Banker's algorithm for 
-       //    is_safe() and req_approved()
  
-  bool is_safe(int id, const vector_<int>& req) { return true; }   
+  bool is_safe(int id, const vector_<int>& req) {
+    vector_<int> avail = get_avail();
+    for(int x = 0; x<avail .size(); x++){
+      if(req[x]<avail[x]){
+        return false;
+      }
+    }
+    return true;
+  }   
   bool req_approved(int id, const vector_<int>& req) { 
     Customer* c = customers[id];
-    return !c->too_much(req); 
+    return (!(c->too_much(req)) && is_safe(id, req));
   }
+
   
   void add_customer(Customer* c) { customers.push_back(c); }
   
@@ -73,5 +83,10 @@ private:
   vector_<int> avail;
   vector_<Customer*> customers;
 };
+
+// bool Bank::req_approved(int id, const vector_<int>& req) { 
+//     Customer* c = customers[id];
+//     return (!(c->too_much(req)) && is_safe(id, req));
+// }
 
 #endif /* __bank_h__ */

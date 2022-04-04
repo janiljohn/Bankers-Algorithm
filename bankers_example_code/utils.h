@@ -7,6 +7,8 @@
 #ifndef __utils_h__
 #define __utils_h__
 
+#include <iostream>
+#include <mutex>
 #include <semaphore.h>
 
 

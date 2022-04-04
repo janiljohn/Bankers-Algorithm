@@ -1,3 +1,5 @@
+// Joel Anil John and Indrajeet Patwardhan
+
 //===========================================================
 // bank_algo.cpp
 //-----------------------------------------------------------
@@ -11,20 +13,21 @@
 #include "customer.h"
 #include "utils.h"
 //  change to use #include <semaphore.h>  if not on macOS
-#include <dispatch/dispatch.h>
+#include <semaphore.h> 
+#include <string.h>
+#include <stdio.h>
+#include <pthread.h>
 
     // change to use sem_t sem;    if not on macOS
-dispatch_semaphore_t  sem;
+sem_t sem;
 
 
 void* runner(void* param) {           // thread runner
     Customer* c = (Customer*)param;
 
-        // TODO: change to use sem_wait() if not on macOS
-    dispatch_semaphore_wait(sem, DISPATCH_TIME_FOREVER);
+    sem_wait(&sem);
     Utils::print_locked("%s%d%s", "<<< Customer thread p#", c->get_id(), " started... >>>\n");
-        // TODO: change to use sem_post() if not on macOS
-    dispatch_semaphore_signal(sem);
+    sem_post(&sem);
 
     Bank* b = c->get_bank();
                            // TODO...
@@ -37,40 +40,32 @@ void* runner(void* param) {           // thread runner
         bool approved = b->req_approved(idx, req);
 
         if (approved) {
-                // TODO: change to use sem_wait() if not on macOS
-            dispatch_semaphore_wait(sem, DISPATCH_TIME_FOREVER);
+            sem_wait(&sem);
             Utils::print_locked("P%d requesting: %s    ............. request APPROVED!\n", 
                           idx, (req.as_string()).c_str());
             c->alloc_req(req);
             b->withdraw_resources(req);
             b->show();
-                // TODO: change to use sem_post() if not on macOS
-            dispatch_semaphore_signal(sem);
+            sem_post(&sem);
 
             if (c->needs_met()) {
-                    // TODO: ditto
-                dispatch_semaphore_wait(sem, DISPATCH_TIME_FOREVER);
+                sem_wait(&sem);
                 b->deposit_resources(c->get_max());
                 c->release_all_resources();
                 b->show();
-                    // TODO: ditto
-                dispatch_semaphore_signal(sem);
+                sem_post(&sem);
             }
         }
         else {  
-                // TODO: ditto
-            dispatch_semaphore_wait(sem, DISPATCH_TIME_FOREVER);
+            sem_wait(&sem);
             Utils::print_locked("P%d requesting: %s     --- Request DENIED\n", idx, (req.as_string()).c_str());
-                // TODO: ditto
-            dispatch_semaphore_signal(sem);
+            sem_post(&sem);
         }
     }
-        // TODO: ditto
-    dispatch_semaphore_wait(sem, DISPATCH_TIME_FOREVER);
+    sem_wait(&sem);
     Utils::print_locked(">>>>>>>>>>>>>>> Customer thread p#%d shutting down... <<<<<<<<<<<<<<<<<\n\n", c->get_id());
     b->show();
-        // TODO: ditto
-    dispatch_semaphore_signal(sem);
+    sem_post(&sem);
 
     pthread_exit(0);
 }
@@ -158,17 +153,88 @@ int main(int argc, const char * argv[]) {
 
     // now we have the filestream open
     Bank* bank = nullptr;
-    sem = dispatch_semaphore_create(1);     // OR use your version of sem_create
+    sem_init(&sem, 0, 1);
 
     process_filestream(ifs, bank);
 
     run_simulation(bank);
      
-    dispatch_release(sem);                  // OR use your version of sem_release
+    sem_destroy(&sem);                  // OR use your version of sem_release
     
     std::cout << "\n\t...done.  (all processes should show 0 resources left when finished)\n";
     std::cout << "\t\t... Test with all input files provided...\n";
     std::cout << "\t\t... data/bankers_tinier.txt, data/bankers_tiny.txt, ...\n\n";
     return 0;
 }
- 
+
+/*
+buf is: 7, 7, 8
+buf is: 3, 2, 1,    3, 3, 3
+buf is: 1, 2, 1,    2, 2, 2
+buf is: 1, 1, 1,    1, 3, 1
+buf is: 0, 0, 1,    1, 1, 1
+buf is:
+
+Banker's algorithm simulation beginning...
+--------------------------------------------
+
++-----------------------------------------
+|     BANK   avail: [7  7  8]
++-----------------------------------------
+| P#  0     3  2  1    3  3  3    0  1  2 
+| P#  1     1  2  1    2  2  2    1  0  1
+| P#  2     1  1  1    1  3  1    0  2  0
+| P#  3     0  0  1    1  1  1    1  1  0
++-----------------------------------------
+<<< Customer thread p#0 started... >>>
+<<< Customer thread p#1 started... >>>
+<<< Customer thread p#2 started... >>>
+<<< Customer thread p#3 started... >>>
+P0 requesting : 0  2  2   --- Request DENIED
+P1 requesting : 3  0  3   --- Request DENIED
+P2 requesting : 0  2  0   .......... request APPROVED!
+
++-----------------------------------------
+|     BANK   avail: [7  5  8]
++-----------------------------------------
+| P#  0     3  2  1    3  3  3    0  1  2 
+| P#  1     1  2  1    2  2  2    1  0  1
+| P#  2     1  3  1    1  3  1    0  0  0
+| P#  3     0  0  1    1  1  1    1  1  0
++-----------------------------------------
+
++-----------------------------------------
+|     BANK   avail: [10 10 10]
++-----------------------------------------
+| P#  0     0  0  0    0  0  0    0  0  0 
+| P#  1     2  2  2    2  2  2    0  0  0
+| P#  2     0  0  0    0  0  0    0  0  0
+| P#  3     0  0  0    0  0  0    0  0  0
++-----------------------------------------
+Customer p#1 has released all resources and is shutting down
+
++-----------------------------------------
+|     BANK   avail: [12 12 12]
++-----------------------------------------
+| P#  0     0  0  0    0  0  0    0  0  0 
+| P#  1     0  0  0    0  0  0    0  0  0
+| P#  2     0  0  0    0  0  0    0  0  0
+| P#  3     0  0  0    0  0  0    0  0  0
++-----------------------------------------
+>>>>>>>>>>>>>>> Customer thread p#1 shutting down... >>>>>>>>>>>>>>>
+
++-----------------------------------------
+|     BANK   avail: [12 12 12]
++-----------------------------------------
+| P#  0     0  0  0    0  0  0    0  0  0 
+| P#  1     0  0  0    0  0  0    0  0  0
+| P#  2     0  0  0    0  0  0    0  0  0
+| P#  3     0  0  0    0  0  0    0  0  0
++-----------------------------------------
+
+Banker's algorithm simulation completed...
+
+    ...done
+
+
+*/
